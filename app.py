@@ -56,9 +56,17 @@ def test():
 
 @app.route("/register", methods=["GET", "POST"])
 def register():
+    user = get_current_user()
+
     if request.method == "POST":
         db = get_db()
         name = request.form["name"]
+        user_cur = db.execute("select id from users where name = ?", [name])
+
+        existing_user = user_cur.fetchone()
+        if existing_user:
+            return render_template("register.html", error="User already exists!")
+
         hashed_password = generate_password_hash(
             request.form["password"], method="sha256"
         )
@@ -100,7 +108,6 @@ def login():
     return render_template("login.html")
 
 
-# TODO
 @app.route("/question/<int:question_id>")
 def question(question_id):
     user = get_current_user()
