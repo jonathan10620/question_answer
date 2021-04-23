@@ -126,6 +126,12 @@ def question(question_id):
 @app.route("/answer/<int:question_id>", methods=["GET", "POST"])
 def answer(question_id):
     user = get_current_user()
+    if not user:
+        return redirect(url_for("login"))
+
+    if user["expert"] == 0:
+        return redirect(url_for("index"))
+
     db = get_db()
     if request.method == "POST":
         answer = request.form["answer"]
@@ -150,6 +156,8 @@ def answer(question_id):
 @app.route("/ask", methods=["GET", "POST"])
 def ask():
     user = get_current_user()
+    if not user:
+        return redirect(url_for("login"))
     db = get_db()
 
     if request.method == "POST":
@@ -171,6 +179,12 @@ def ask():
 @app.route("/unanswered")
 def unanswered():
     user = get_current_user()
+    if not user:
+        return redirect(url_for("login"))
+
+    if user["expert"] == 0:
+        return redirect(url_for("index"))
+
     db = get_db()
 
     question_curs = db.execute(
@@ -185,6 +199,12 @@ def unanswered():
 @app.route("/users")
 def users():
     user = get_current_user()
+    if not user:
+        return redirect(url_for("login"))
+
+    if user["admin"] == 0:
+        return redirect(url_for("index"))
+
     db = get_db()
 
     user_cur = db.execute("select id, name,expert, admin from users")
@@ -195,6 +215,7 @@ def users():
 
 @app.route("/logout")
 def logout():
+
     session.pop("user", None)
 
     return redirect(url_for("index"))
@@ -202,6 +223,11 @@ def logout():
 
 @app.route("/promote/<int:user_id>")
 def promote(user_id):
+    user = get_current_user()
+    if not user:
+        return redirect(url_for("login"))
+    if user["admin"] == 0:
+        return redirect(url_for("index"))
     db = get_db()
     exp_cur = db.execute("select expert from users where id = ?", [user_id])
     user = exp_cur.fetchone()
