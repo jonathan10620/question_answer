@@ -34,8 +34,18 @@ def close_db(error):
 @app.route("/")
 def index():
     user = get_current_user()
+    db = get_db()
 
-    return render_template("home.html", user=user)
+    ques_curs = db.execute(
+        """select questions.id as question_id, questions.question_text, askers.name as asker_name, experts.name as expert_name from questions
+        join users as askers on askers.id = questions.asked_by_id 
+        join users as experts on experts.id = questions.expert_id 
+        where questions.answer_text not null"""
+    )
+
+    question_result = ques_curs.fetchall()
+
+    return render_template("home.html", user=user, questions=question_result)
 
 
 @app.route("/test")
@@ -90,28 +100,79 @@ def login():
     return render_template("login.html")
 
 
-@app.route("/question")
-def question():
+# TODO
+@app.route("/question/<int:question_id>")
+def question(question_id):
     user = get_current_user()
-    return render_template("question.html", user=user)
+    db = get_db()
+    question_curs = db.execute(
+        """select questions.question_text, questions.answer_text, askers.name as asker_name, experts.name as expert_name from questions
+        join users as askers on askers.id = questions.asked_by_id 
+        join users as experts on experts.id = questions.expert_id where questions.id = ?""",
+        [question_id],
+    )
+    question = question_curs.fetchone()
+
+    return render_template("question.html", user=user, question=question)
 
 
-@app.route("/answer")
-def answer():
+@app.route("/answer/<int:question_id>", methods=["GET", "POST"])
+def answer(question_id):
     user = get_current_user()
-    return render_template("answer.html", user=user)
+    db = get_db()
+    if request.method == "POST":
+        answer = request.form["answer"]
+
+        db.execute(
+            "update questions set answer_text = ? where id = ?",
+            [answer, question_id],
+        )
+        db.commit()
+
+        return redirect(url_for("unanswered"))
+
+    ques_curs = db.execute(
+        "select id, question_text from questions where id = ?", [question_id]
+    )
+    question = ques_curs.fetchone()
+
+    user = get_current_user()
+    return render_template("answer.html", user=user, question=question)
 
 
-@app.route("/ask")
+@app.route("/ask", methods=["GET", "POST"])
 def ask():
     user = get_current_user()
-    return render_template("ask.html", user=user)
+    db = get_db()
+
+    if request.method == "POST":
+        db.execute(
+            """insert into questions (question_text, asked_by_id, expert_id) values (?, ?, ?)""",
+            [request.form["question"], user["id"], request.form["expert"]],
+        )
+        db.commit()
+
+        return redirect(url_for("question"))
+
+    exp_cur = db.execute("select id, name from users where expert = 1")
+
+    experts = exp_cur.fetchall()
+
+    return render_template("ask.html", user=user, experts=experts)
 
 
 @app.route("/unanswered")
 def unanswered():
     user = get_current_user()
-    return render_template("unanswered.html", user=user)
+    db = get_db()
+
+    question_curs = db.execute(
+        "select questions.id, questions.question_text, questions.asked_by_id, users.name from questions join users on users.id = questions.asked_by_id where questions.answer_text is null and questions.expert_id = ?",
+        [user["id"]],
+    )
+    questions = question_curs.fetchall()
+
+    return render_template("unanswered.html", user=user, questions=questions)
 
 
 @app.route("/users")
