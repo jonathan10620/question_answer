@@ -60,7 +60,9 @@ def register():
 
         db.commit()
 
-        return "<h1>User created</h1>"
+        session["user"] = name
+
+        return redirect(url_for("index"))
 
     return render_template("register.html")
 
@@ -81,6 +83,7 @@ def login():
 
         if check_password_hash(user_result["password"], password):
             session["user"] = user_result["name"]
+            return redirect(url_for("index"))
         else:
             return "password incorrect"
 
@@ -90,31 +93,36 @@ def login():
 @app.route("/question")
 def question():
     user = get_current_user()
-    return render_template("question.html")
+    return render_template("question.html", user=user)
 
 
 @app.route("/answer")
 def answer():
     user = get_current_user()
-    return render_template("answer.html")
+    return render_template("answer.html", user=user)
 
 
 @app.route("/ask")
 def ask():
     user = get_current_user()
-    return render_template("ask.html")
+    return render_template("ask.html", user=user)
 
 
 @app.route("/unanswered")
 def unanswered():
     user = get_current_user()
-    return render_template("unanswered.html")
+    return render_template("unanswered.html", user=user)
 
 
 @app.route("/users")
 def users():
     user = get_current_user()
-    return render_template("users.html")
+    db = get_db()
+
+    user_cur = db.execute("select id, name,expert, admin from users")
+
+    users_results = user_cur.fetchall()
+    return render_template("users.html", user=user, users=users_results)
 
 
 @app.route("/logout")
@@ -122,6 +130,21 @@ def logout():
     session.pop("user", None)
 
     return redirect(url_for("index"))
+
+
+@app.route("/promote/<int:user_id>")
+def promote(user_id):
+    db = get_db()
+    exp_cur = db.execute("select expert from users where id = ?", [user_id])
+    user = exp_cur.fetchone()
+    if user["expert"] == 0:
+        db.execute("update users set expert = '1' where id = ?", [user_id])
+        db.commit()
+    else:
+        db.execute("update users set expert = '0' where id = ?", [user_id])
+        db.commit()
+
+    return redirect(url_for("users"))
 
 
 if __name__ == "__main__":
